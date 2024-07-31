@@ -10,6 +10,7 @@ using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.Colors;
 using JetBrains.ReSharper.Psi.Modules;
 using JetBrains.ReSharper.Psi.Resolve;
+using JetBrains.ReSharper.Psi.Tree;
 
 using MonoMod.RuntimeDetour;
 
@@ -44,6 +45,13 @@ public class XnaColorsComponent
 
         lifetime_extender.Add(
             new Hook(
+                typeof(PredefinedColorTypes).GetMethod(nameof(ColorReferenceFromInvocation), BindingFlags.Static | BindingFlags.Public)!,
+                typeof(XnaColorsComponent).GetMethod(nameof(ColorReferenceFromInvocation), BindingFlags.Static   | BindingFlags.NonPublic)!
+            )
+        );
+
+        lifetime_extender.Add(
+            new Hook(
                 typeof(PredefinedColorTypes).GetMethod(nameof(TryReplaceAsInvocation), BindingFlags.Instance | BindingFlags.Public)!,
                 typeof(XnaColorsComponent).GetMethod(nameof(TryReplaceAsInvocation), BindingFlags.Static     | BindingFlags.NonPublic)!
             )
@@ -67,6 +75,19 @@ public class XnaColorsComponent
 
         var predefinedColorTypes = PredefinedColorTypes.Get(qualifierReference.GetTreeNode().GetPsiModule());
         return predefinedColorTypes.IsXnaColorType(typeElement) ? typeElement : orig(qualifierReference);
+    }
+
+    [CanBeNull]
+    private static IColorReference ColorReferenceFromInvocation(
+        Func<StringComparer, IReference, IReference, IArgument[], Func<ITypeElement, IColorElement, IColorReference>, IColorReference> orig,
+        [NotNull] StringComparer                                                                                                       comparer,
+        [NotNull] IReference                                                                                                           qualifierReference,
+        [NotNull] IReference                                                                                                           methodReference,
+        [NotNull] IArgument[]                                                                                                          args,
+        [NotNull] Func<ITypeElement, IColorElement, IColorReference>                                                                   factory
+    )
+    {
+        return orig(comparer, qualifierReference, methodReference, args, factory);
     }
 
     private static void TryReplaceAsInvocation(
