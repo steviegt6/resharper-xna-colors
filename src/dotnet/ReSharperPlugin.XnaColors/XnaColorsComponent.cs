@@ -10,6 +10,7 @@ using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.Colors;
 using JetBrains.ReSharper.Psi.CSharp.Resolve;
 using JetBrains.ReSharper.Psi.CSharp.Tree;
+using JetBrains.ReSharper.Psi.Impl.reflection2.elements.Compiled;
 using JetBrains.ReSharper.Psi.Modules;
 using JetBrains.ReSharper.Psi.Resolve;
 using JetBrains.ReSharper.Psi.Tree;
@@ -151,7 +152,20 @@ public class XnaColorsComponent
 
     private static IColorReference ReferenceFromConstructor(ICSharpInvocationReference reference)
     {
-        if (PredefinedColorTypes.GetQualifierType(reference))
+        /*if (reference.Resolve().DeclaredElement is not Constructor ctor)
+        {
+            return null;
+        }
+        
+        if (PredefinedColorTypes.GetQualifierType(ctor.ContainingType) is not { } colorElement)
+        {
+            return null;
+        }*/
+
+        if (PredefinedColorTypes.GetQualifierType(reference.Invocation.Reference.Invocation.Reference.Invocation.Reference) is not { } colorElement)
+        {
+            
+        }
         
         var invocation = reference.Invocation;
         if (!invocation.Arguments.CountIs(3) && !invocation.Arguments.CountIs(4))
