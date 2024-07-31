@@ -1,2 +1,5 @@
-# Auto detect text files and perform LF normalization
+# Set the default behavior, in case people don't have core.autocrlf set.
 * text=auto
+
+# Preserve line endings in gradle scripts
+gradlew* -text diff
