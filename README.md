@@ -6,4 +6,3 @@
 ---
 
 Defines the XNA color type such that ReSharper can display the value inlined.
-~~~~
