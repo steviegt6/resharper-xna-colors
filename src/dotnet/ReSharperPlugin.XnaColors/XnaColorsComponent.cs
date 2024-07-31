@@ -8,9 +8,12 @@ using JetBrains.Application.Notifications;
 using JetBrains.Lifetimes;
 using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.Colors;
+using JetBrains.ReSharper.Psi.CSharp.Resolve;
+using JetBrains.ReSharper.Psi.CSharp.Tree;
 using JetBrains.ReSharper.Psi.Modules;
 using JetBrains.ReSharper.Psi.Resolve;
 using JetBrains.ReSharper.Psi.Tree;
+using JetBrains.Util;
 
 using MonoMod.RuntimeDetour;
 
@@ -54,6 +57,14 @@ public class XnaColorsComponent
             new Hook(
                 typeof(PredefinedColorTypes).GetMethod(nameof(TryReplaceAsInvocation), BindingFlags.Instance | BindingFlags.Public)!,
                 typeof(XnaColorsComponent).GetMethod(nameof(TryReplaceAsInvocation), BindingFlags.Static     | BindingFlags.NonPublic)!
+            )
+        );
+
+        var visualElementFactoryType = Type.GetType("JetBrains.ReSharper.Feature.Services.CSharp.VisualElements.VisualElementFactory, JetBrains.ReSharper.Feature.Services.CSharp")!;
+        lifetime_extender.Add(
+            new Hook(
+                visualElementFactoryType.GetMethod(nameof(GetColorReference), BindingFlags.Instance | BindingFlags.Public)!,
+                typeof(XnaColorsComponent).GetMethod(nameof(GetColorReference), BindingFlags.Static | BindingFlags.NonPublic)!
             )
         );
 
@@ -107,5 +118,46 @@ public class XnaColorsComponent
         {
             orig(self, qualifierType, colorElement, replace);
         }
+    }
+
+    private static IColorReference GetColorReference(
+        Func<object /*VisualElementFactory*/, ITreeNode, IColorReference> orig,
+        [NotNull] object /*VisualElementFactory*/                         self,
+        ITreeNode                                                         element
+    )
+    {
+        if (orig(self, element) is { } ret)
+        {
+            return ret;
+        }
+
+        if (element is IObjectCreationExpression creationExpression)
+        {
+            return ReferenceFromConstructor(creationExpression.Reference);
+        }
+
+        /*if (element is not IReferenceExpression referenceExpression)
+        {
+            return null;
+        }
+
+        if (referenceExpression.QualifierExpression is not IReferenceExpression qualifier)
+        {
+            return null;
+        }*/
+
+        return null;
+    }
+
+    private static IColorReference ReferenceFromConstructor(ICSharpInvocationReference reference)
+    {
+        if (PredefinedColorTypes.GetQualifierType(reference))
+        
+        var invocation = reference.Invocation;
+        if (!invocation.Arguments.CountIs(3) && !invocation.Arguments.CountIs(4))
+        {
+            return null;
+        }
+        return null;
     }
 }
