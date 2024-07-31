@@ -1,5 +1,4 @@
-using System.Collections.Generic;
-using System.Linq;
+using System.Runtime.CompilerServices;
 
 using JetBrains.Annotations;
 using JetBrains.Metadata.Reader.API;
@@ -10,42 +9,54 @@ using JetBrains.ReSharper.Psi.Modules;
 
 namespace ReSharperPlugin.XnaColors;
 
-public class PredefinedColorTypesEx
+public static class PredefinedColorTypesEx
 {
+    public class Data
+    {
+        public bool Initialized { get; internal set; }
+
+        [CanBeNull]
+        public ITypeElement XnaColorType { get; set; }
+    }
+
     private static readonly IClrTypeName xna_color_type_name = new ClrTypeName("Microsoft.Xna.Framework.Color");
 
-    [CanBeNull]
-    public ITypeElement XnaColorType { get; }
+    private static readonly ConditionalWeakTable<PredefinedColorTypes, Data> cwt = new();
 
-    public ICollection<PredefinedColorTypes.ColorDefiningType> ColorDefiningTypes { get; }
-
-    internal PredefinedColorTypesEx([NotNull] IPsiModule module)
+    internal static void Initialize([NotNull] PredefinedColorTypes @this, [NotNull] IPsiModule module)
     {
-        var symbolScope = module.GetPsiServices().Symbols.GetSymbolScope(module, withReferences: true, caseSensitive: true);
+        if (@this.GetOrCreateData().Initialized)
         {
-            XnaColorType = symbolScope.GetTypeElementByCLRName(xna_color_type_name);
+            return;
         }
 
-        ColorDefiningTypes = new List<PredefinedColorTypes.ColorDefiningType>
+        @this.GetOrCreateData().Initialized = true;
+
+        var symbolScope = module.GetPsiServices().Symbols.GetSymbolScope(module, withReferences: true, caseSensitive: true);
         {
-            new(XnaColorType)
-            {
-                UnderlyingColorType      = XnaColorType,
-                DefinesColorProperties   = true,
-                HasColorBuildingFunction = true,
-            },
-        }.AsReadOnly();
-        ColorDefiningTypes = ColorDefiningTypes.Where(x => x.UnderlyingColorType is not null && x.ColorProvidingType is not null).ToList();
+            @this.GetOrCreateData().XnaColorType = symbolScope.GetTypeElementByCLRName(xna_color_type_name);
+        }
+
+        if (@this.GetOrCreateData().XnaColorType is not null)
+        {
+            @this.ColorDefiningTypes.Add(
+                new PredefinedColorTypes.ColorDefiningType(@this.GetOrCreateData().XnaColorType)
+                {
+                    UnderlyingColorType      = @this.GetOrCreateData().XnaColorType,
+                    DefinesColorProperties   = true,
+                    HasColorBuildingFunction = true,
+                }
+            );
+        }
     }
 
-    public static PredefinedColorTypesEx Get([NotNull] IPsiModule module)
+    public static Data GetOrCreateData([NotNull] this PredefinedColorTypes @this)
     {
-        // TODO
-        return null;
+        return cwt.GetOrCreateValue(@this);
     }
 
-    public bool IsXnaColorType(ITypeElement typeElement)
+    public static bool IsXnaColorType([NotNull] this PredefinedColorTypes @this, ITypeElement typeElement)
     {
-        return XnaColorType is not null && XnaColorType.Equals(typeElement);
+        return @this.GetOrCreateData().XnaColorType?.Equals(typeElement) ?? false;
     }
 }

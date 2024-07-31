@@ -192,6 +192,12 @@ prepareSandbox {
             "$outputFolder/${DotnetPluginId}.dll",
             "$outputFolder/${DotnetPluginId}.pdb",
             // TODO: add additional assemblies
+            "${rootDir}/lib/MonoMod.Backports.dll",
+            "${rootDir}/lib/MonoMod.Core.dll",
+            "${rootDir}/lib/MonoMod.Iced.dll",
+            "${rootDir}/lib/MonoMod.ILHelpers.dll",
+            "${rootDir}/lib/MonoMod.RuntimeDetour.dll",
+            "${rootDir}/lib/MonoMod.Utils.dll",
     ]
 
     dllFiles.forEach({ f ->
