@@ -1,20 +1,26 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Reflection;
 
+using JetBrains;
 using JetBrains.Annotations;
 using JetBrains.Application;
 using JetBrains.Application.Notifications;
+using JetBrains.Diagnostics;
 using JetBrains.Lifetimes;
+using JetBrains.ReSharper.Feature.Services.CSharp.VisualElements;
 using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.Colors;
 using JetBrains.ReSharper.Psi.CSharp.Resolve;
 using JetBrains.ReSharper.Psi.CSharp.Tree;
-using JetBrains.ReSharper.Psi.Impl.reflection2.elements.Compiled;
 using JetBrains.ReSharper.Psi.Modules;
 using JetBrains.ReSharper.Psi.Resolve;
 using JetBrains.ReSharper.Psi.Tree;
 using JetBrains.Util;
+using JetBrains.Util.Media;
+using JetBrains.Util.Special;
 
 using MonoMod.RuntimeDetour;
 
@@ -122,9 +128,9 @@ public class XnaColorsComponent
     }
 
     private static IColorReference GetColorReference(
-        Func<object /*VisualElementFactory*/, ITreeNode, IColorReference> orig,
-        [NotNull] object /*VisualElementFactory*/                         self,
-        ITreeNode                                                         element
+        Func<VisualElementFactory, ITreeNode, IColorReference> orig,
+        [NotNull] VisualElementFactory                         self,
+        ITreeNode                                              element
     )
     {
         if (orig(self, element) is { } ret)
@@ -134,7 +140,7 @@ public class XnaColorsComponent
 
         if (element is IObjectCreationExpression creationExpression)
         {
-            return ReferenceFromConstructor(creationExpression.Reference);
+            return ReferenceFromConstructor(creationExpression, creationExpression.Reference);
         }
 
         /*if (element is not IReferenceExpression referenceExpression)
@@ -150,28 +156,195 @@ public class XnaColorsComponent
         return null;
     }
 
-    private static IColorReference ReferenceFromConstructor(ICSharpInvocationReference reference)
+    private static IColorReference ReferenceFromConstructor(IObjectCreationExpression expression, ICSharpInvocationReference reference)
     {
         /*if (reference.Resolve().DeclaredElement is not Constructor ctor)
         {
             return null;
         }
-        
+
         if (PredefinedColorTypes.GetQualifierType(ctor.ContainingType) is not { } colorElement)
         {
             return null;
         }*/
 
-        if (PredefinedColorTypes.GetQualifierType(reference.Invocation.Reference.Invocation.Reference.Invocation.Reference) is not { } colorElement)
-        {
-            
-        }
-        
-        var invocation = reference.Invocation;
-        if (!invocation.Arguments.CountIs(3) && !invocation.Arguments.CountIs(4))
+        if (reference.Resolve().DeclaredElement is not IConstructor ctor)
         {
             return null;
         }
+
+        var invocation           = reference.Invocation;
+        var args                 = invocation.Arguments.Cast<IArgument>().ToList();
+
+        if (PredefinedColorTypes.Get(expression.GetPsiModule()).IsXnaColorType(ctor.ContainingType))
+        {
+            // RGB
+            if (args.CountIs(3))
+            {
+                if (invocation.Reference?.Resolve().DeclaredElement is not IFunction func || !func.Parameters.CountIs(3))
+                {
+                    return null;
+                }
+
+                var color = BuildBaseColorWithAlphaIntConstant(args);
+                color ??= BuildBaseColorWithAlphaFloatConstant(args);
+
+                if (!color.HasValue)
+                {
+                    return null;
+                }
+
+                return new MyColorReference(new ColorElement(color.Value, null), ctor.ContainingType, expression);
+            }
+
+            // RGBA
+            if (invocation.Arguments.CountIs(4))
+            {
+                if (invocation.Reference?.Resolve().DeclaredElement is not IFunction func || !func.Parameters.CountIs(4))
+                {
+                    return null;
+                }
+
+                var color = BuildBaseColorWithAlphaIntConstant(args);
+                color ??= BuildBaseColorWithAlphaFloatConstant(args);
+
+                if (!color.HasValue)
+                {
+                    return null;
+                }
+
+                return new MyColorReference(new ColorElement(color.Value, null), ctor.ContainingType, expression);
+            }
+        }
+
         return null;
+    }
+
+    private static JetRgbaColor? BuildBaseColorWithAlphaIntConstant(IList<IArgument> args)
+    {
+        int? a = GetArgumentAsIntConstant(args, "alpha", 0, 255) ?? GetArgumentAsIntConstant(args, "a", 0, 255);
+        int? r = GetArgumentAsIntConstant(args, "red",   0, 255) ?? GetArgumentAsIntConstant(args, "r", 0, 255);
+        int? g = GetArgumentAsIntConstant(args, "green", 0, 255) ?? GetArgumentAsIntConstant(args, "g", 0, 255);
+        int? b = GetArgumentAsIntConstant(args, "blue",  0, 255) ?? GetArgumentAsIntConstant(args, "b", 0, 255);
+
+        if (!r.HasValue || !g.HasValue || !b.HasValue)
+        {
+            return null;
+        }
+
+        return JetRgbaColor.FromRgba((byte)r.Value, (byte)g.Value, (byte)b.Value, (byte)(a ?? 255));
+    }
+
+    private static JetRgbaColor? BuildBaseColorWithAlphaFloatConstant(IList<IArgument> args)
+    {
+        float? a = GetArgumentAsFloatConstant(args, "alpha", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "a", 0f, 1f);
+        float? r = GetArgumentAsFloatConstant(args, "red",   0f, 1f) ?? GetArgumentAsFloatConstant(args, "r", 0f, 1f);
+        float? g = GetArgumentAsFloatConstant(args, "green", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "g", 0f, 1f);
+        float? b = GetArgumentAsFloatConstant(args, "blue",  0f, 1f) ?? GetArgumentAsFloatConstant(args, "b", 0f, 1f);
+
+        if (!r.HasValue || !g.HasValue || !b.HasValue)
+        {
+            return null;
+        }
+
+        return JetRgbaColor.FromRgba((byte)(r.Value / 255f), (byte)(g.Value / 255f), (byte)(b.Value / 255f), (byte)((a ?? 255) / 255f));
+    }
+
+    private static int? GetArgumentAsIntConstant([NotNull] IEnumerable<IArgument> args, [NotNull] string parameterName, int min, int max)
+    {
+        var argument2 = args.FirstOrDefault(argument => argument.MatchingParameter.IfNotNull(parameter => parameterName.Equals(parameter.Element.ShortName, StringComparison.Ordinal)));
+        if (argument2 == null)
+        {
+            return null;
+        }
+
+        var type       = argument2.MatchingParameter.NotNull("matchingParameter != null").Element.Type;
+        var expression = argument2.Expression;
+        if (expression == null)
+        {
+            return null;
+        }
+
+        var constantValue = expression.ConstantValue;
+        if (constantValue.IsErrorOrNonCompileTimeConstantValue())
+        {
+            return null;
+        }
+
+        var typeConversionRule = argument2.Language.TypeConversionRule(expression);
+        if (typeConversionRule == null)
+        {
+            return null;
+        }
+
+        if (!expression.GetExpressionType().IsImplicitlyConvertibleTo(type, typeConversionRule))
+        {
+            return null;
+        }
+
+        double? num = null;
+        try
+        {
+            num = Convert.ToDouble(constantValue.Value, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        if (!num.HasValue || double.IsNaN(num.Value) || double.IsInfinity(num.Value) || Math.Truncate(num.Value) != num.Value || num.Value.Clamp(min, max) != num.Value)
+        {
+            return null;
+        }
+        return (int)num.Value;
+    }
+
+    private static float? GetArgumentAsFloatConstant([NotNull] IEnumerable<IArgument> args, [NotNull] string parameterName, float min, float max)
+    {
+        var argument2 = args.FirstOrDefault(argument => argument.MatchingParameter.IfNotNull(parameter => parameterName.Equals(parameter.Element.ShortName, StringComparison.Ordinal)));
+        if (argument2 == null)
+        {
+            return null;
+        }
+
+        var type       = argument2.MatchingParameter.NotNull("matchingParameter != null").Element.Type;
+        var expression = argument2.Expression;
+        if (expression == null)
+        {
+            return null;
+        }
+
+        var constantValue = expression.ConstantValue;
+        if (constantValue.IsErrorOrNonCompileTimeConstantValue())
+        {
+            return null;
+        }
+
+        var typeConversionRule = argument2.Language.TypeConversionRule(expression);
+        if (typeConversionRule == null)
+        {
+            return null;
+        }
+
+        if (!expression.GetExpressionType().IsImplicitlyConvertibleTo(type, typeConversionRule))
+        {
+            return null;
+        }
+
+        double? num = null;
+        try
+        {
+            num = Convert.ToDouble(constantValue.Value, CultureInfo.InvariantCulture);
+        }
+        catch
+        {
+            // ignore
+        }
+
+        if (!num.HasValue || double.IsNaN(num.Value) || double.IsInfinity(num.Value) || Math.Truncate(num.Value) != num.Value || num.Value.Clamp(min, max) != num.Value)
+        {
+            return null;
+        }
+        return (float)num.Value;
     }
 }
