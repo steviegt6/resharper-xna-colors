@@ -18,7 +18,6 @@
 
         <PackageReference Include="Krafs.Publicizer" Version="2.2.1" PrivateAssets="all"/>
         <Publicize Include="JetBrains.ReSharper.Psi"/>
-        <Publicize Include="JetBrains.ReSharper.Feature.Services.CSharp"/>
     </ItemGroup>
 
 </Project>

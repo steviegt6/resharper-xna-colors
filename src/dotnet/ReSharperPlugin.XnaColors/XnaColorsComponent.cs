@@ -10,7 +10,6 @@ using JetBrains.Application;
 using JetBrains.Application.Notifications;
 using JetBrains.Diagnostics;
 using JetBrains.Lifetimes;
-using JetBrains.ReSharper.Feature.Services.CSharp.VisualElements;
 using JetBrains.ReSharper.Psi;
 using JetBrains.ReSharper.Psi.Colors;
 using JetBrains.ReSharper.Psi.CSharp.Resolve;
@@ -128,9 +127,9 @@ public class XnaColorsComponent
     }
 
     private static IColorReference GetColorReference(
-        Func<VisualElementFactory, ITreeNode, IColorReference> orig,
-        [NotNull] VisualElementFactory                         self,
-        ITreeNode                                              element
+        Func<object /*VisualElementFactory*/, ITreeNode, IColorReference> orig,
+        [NotNull] object /*VisualElementFactory*/                         self,
+        ITreeNode                                                         element
     )
     {
         if (orig(self, element) is { } ret)
@@ -173,8 +172,8 @@ public class XnaColorsComponent
             return null;
         }
 
-        var invocation           = reference.Invocation;
-        var args                 = invocation.Arguments.Cast<IArgument>().ToList();
+        var invocation = reference.Invocation;
+        var args       = invocation.Arguments.Cast<IArgument>().ToList();
 
         if (PredefinedColorTypes.Get(expression.GetPsiModule()).IsXnaColorType(ctor.ContainingType))
         {
