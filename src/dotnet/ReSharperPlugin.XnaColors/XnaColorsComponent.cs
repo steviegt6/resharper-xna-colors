@@ -222,10 +222,10 @@ public class XnaColorsComponent
 
     private static JetRgbaColor? BuildBaseColorWithAlphaIntConstant(IList<IArgument> args)
     {
-        int? a = GetArgumentAsIntConstant(args, "alpha", 0, 255) ?? GetArgumentAsIntConstant(args, "a", 0, 255);
-        int? r = GetArgumentAsIntConstant(args, "red",   0, 255) ?? GetArgumentAsIntConstant(args, "r", 0, 255);
-        int? g = GetArgumentAsIntConstant(args, "green", 0, 255) ?? GetArgumentAsIntConstant(args, "g", 0, 255);
-        int? b = GetArgumentAsIntConstant(args, "blue",  0, 255) ?? GetArgumentAsIntConstant(args, "b", 0, 255);
+        var a = GetArgumentAsIntConstant(args, "alpha", 0, 255) ?? GetArgumentAsIntConstant(args, "a", 0, 255);
+        var r = GetArgumentAsIntConstant(args, "red",   0, 255) ?? GetArgumentAsIntConstant(args, "r", 0, 255);
+        var g = GetArgumentAsIntConstant(args, "green", 0, 255) ?? GetArgumentAsIntConstant(args, "g", 0, 255);
+        var b = GetArgumentAsIntConstant(args, "blue",  0, 255) ?? GetArgumentAsIntConstant(args, "b", 0, 255);
 
         if (!r.HasValue || !g.HasValue || !b.HasValue)
         {
@@ -237,17 +237,17 @@ public class XnaColorsComponent
 
     private static JetRgbaColor? BuildBaseColorWithAlphaFloatConstant(IList<IArgument> args)
     {
-        float? a = GetArgumentAsFloatConstant(args, "alpha", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "a", 0f, 1f);
-        float? r = GetArgumentAsFloatConstant(args, "red",   0f, 1f) ?? GetArgumentAsFloatConstant(args, "r", 0f, 1f);
-        float? g = GetArgumentAsFloatConstant(args, "green", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "g", 0f, 1f);
-        float? b = GetArgumentAsFloatConstant(args, "blue",  0f, 1f) ?? GetArgumentAsFloatConstant(args, "b", 0f, 1f);
+        var a = GetArgumentAsFloatConstant(args, "alpha", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "a", 0f, 1f);
+        var r = GetArgumentAsFloatConstant(args, "red",   0f, 1f) ?? GetArgumentAsFloatConstant(args, "r", 0f, 1f);
+        var g = GetArgumentAsFloatConstant(args, "green", 0f, 1f) ?? GetArgumentAsFloatConstant(args, "g", 0f, 1f);
+        var b = GetArgumentAsFloatConstant(args, "blue",  0f, 1f) ?? GetArgumentAsFloatConstant(args, "b", 0f, 1f);
 
         if (!r.HasValue || !g.HasValue || !b.HasValue)
         {
             return null;
         }
 
-        return JetRgbaColor.FromRgba((byte)(r.Value / 255f), (byte)(g.Value / 255f), (byte)(b.Value / 255f), (byte)((a ?? 255) / 255f));
+        return JetRgbaColor.FromRgba((byte)(r.Value * 255f), (byte)(g.Value * 255f), (byte)(b.Value * 255f), (byte)((a ?? 1f) * 255f));
     }
 
     private static int? GetArgumentAsIntConstant([NotNull] IEnumerable<IArgument> args, [NotNull] string parameterName, int min, int max)
@@ -341,7 +341,7 @@ public class XnaColorsComponent
             // ignore
         }
 
-        if (!num.HasValue || double.IsNaN(num.Value) || double.IsInfinity(num.Value) || Math.Truncate(num.Value) != num.Value || num.Value.Clamp(min, max) != num.Value)
+        if (!num.HasValue || double.IsNaN(num.Value) || double.IsInfinity(num.Value) || num.Value < min || num.Value > max)
         {
             return null;
         }
